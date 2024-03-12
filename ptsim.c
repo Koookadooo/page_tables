@@ -100,6 +100,65 @@ void new_process(int proc_num, int page_count) {
 }
 
 //
+// Kill a process
+//
+// This includes freeing the process's page table and data pages.
+void kill_process(int proc_num) {
+    int pt_page = get_page_table(proc_num);
+
+    // Free the data pages
+    int pt_addr = get_address(pt_page, 0);
+    for (int i = 0; i < PAGE_COUNT; i++) {
+        int data_page = mem[pt_addr + i];
+        if (data_page != 0) {
+            mem[get_address(0, data_page)] = 0; // Mark page as free
+        }
+    }
+
+    // Free the page table
+    mem[get_address(0, pt_page)] = 0; // Mark page as free
+
+    // Free the page table pointer
+    mem[get_address(0, PTP_OFFSET + proc_num)] = 0; // Mark page as free
+}
+
+//
+// Store value at address sb
+//
+void store_byte(int proc_num, int vaddr, unsigned char val) {
+    unsigned char pt_page = get_page_table(proc_num);
+    int virtual_page = vaddr >> PAGE_SHIFT;
+    int offset = vaddr & 255;
+    int pt_addr = get_address(pt_page, virtual_page);
+    unsigned char phys_page = mem[pt_addr];
+    if (phys_page == 0) {
+        printf("Error: Invalid virtual address\n");
+        return;
+    }
+    int phys_addr = get_address(phys_page, offset);
+    mem[phys_addr] = val;
+    printf("Store proc %d: %d => %d, value=%d\n", proc_num, vaddr, phys_addr, val);
+}
+
+//
+// Load value from address lb
+//
+void load_byte(int proc_num, int vaddr) {
+    unsigned char pt_page = get_page_table(proc_num);
+    int virtual_page = vaddr >> PAGE_SHIFT;
+    int offset = vaddr & 255;
+    int pt_addr = get_address(pt_page, virtual_page);
+    unsigned char phys_page = mem[pt_addr];
+    if (phys_page == 0) {
+        printf("Error: Invalid virtual address\n");
+        return;
+    }
+    int phys_addr = get_address(phys_page, offset);
+    unsigned char val = mem[phys_addr];
+    printf("Load proc %d: %d => %d, value=%d\n", proc_num, vaddr, phys_addr, val);
+}
+
+//
 // Print the free page map
 //
 // Don't modify this
@@ -169,6 +228,21 @@ int main(int argc, char *argv[])
             int page_count = atoi(argv[++i]);
             
             new_process(proc_num, page_count);
+        }
+        else if (strcmp(argv[i], "kp") == 0) {
+            int proc_num = atoi(argv[++i]);
+            kill_process(proc_num);
+        }
+        else if (strcmp(argv[i], "sb") == 0) {
+            int proc_num = atoi(argv[++i]);
+            int vaddr = atoi(argv[++i]);
+            unsigned char val = (unsigned char)atoi(argv[++i]);
+            store_byte(proc_num, vaddr, val);
+        }
+        else if (strcmp(argv[i], "lb") == 0) {
+            int proc_num = atoi(argv[++i]);
+            int vaddr = atoi(argv[++i]);
+            load_byte(proc_num, vaddr);
         }
     }
 }
